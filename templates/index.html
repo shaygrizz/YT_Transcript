@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube → Markdown</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --panel: #ffffff;
+    --text: #1c1c1e;
+    --muted: #6b6b70;
+    --border: #e4e4e7;
+    --accent: #2563eb;
+    --code-bg: #f1f1f3;
+    --error: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111113;
+      --panel: #1a1a1d;
+      --text: #ececf0;
+      --muted: #9a9aa3;
+      --border: #2c2c31;
+      --accent: #60a5fa;
+      --code-bg: #26262b;
+      --error: #f87171;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111113;
+    --panel: #1a1a1d;
+    --text: #ececf0;
+    --muted: #9a9aa3;
+    --border: #2c2c31;
+    --accent: #60a5fa;
+    --code-bg: #26262b;
+    --error: #f87171;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 32px 16px 64px;
+  }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+
+  form { display: flex; gap: 8px; flex-wrap: wrap; }
+  input[type="url"] {
+    flex: 1 1 360px;
+    padding: 12px 14px;
+    font: inherit;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  input[type="url"]:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button {
+    font: inherit;
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: 0.6; cursor: wait; }
+  button.tab[aria-selected="true"] { border-color: var(--accent); color: var(--accent); }
+
+  #status { min-height: 1.5em; margin: 14px 0; color: var(--muted); }
+  #status.error { color: var(--error); }
+
+  #result { display: none; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .toolbar .spacer { flex: 1; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+  }
+  .rendered h1 { font-size: 1.8rem; line-height: 1.25; margin-top: 0; }
+  .rendered h2, .rendered h3 { margin-top: 1.6em; }
+  .rendered p { margin: 0 0 1em; }
+  .rendered a { color: var(--accent); }
+  .rendered blockquote { margin: 1em 0; padding-left: 14px; border-left: 3px solid var(--border); color: var(--muted); }
+  .rendered code { background: var(--code-bg); padding: 2px 5px; border-radius: 4px; font-size: 0.92em; }
+  .rendered pre { background: var(--code-bg); padding: 12px; border-radius: 8px; overflow-x: auto; }
+  .rendered pre code { background: none; padding: 0; }
+  .rendered hr { border: none; border-top: 1px solid var(--border); margin: 1.5em 0; }
+  .rendered img { max-width: 100%; }
+  .rendered table { border-collapse: collapse; width: 100%; display: block; overflow-x: auto; }
+  .rendered th, .rendered td { border: 1px solid var(--border); padding: 6px 10px; }
+
+  textarea#raw {
+    width: 100%;
+    min-height: 60vh;
+    padding: 16px;
+    font: 14px/1.6 ui-monospace, "Cascadia Code", Consolas, monospace;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    resize: vertical;
+  }
+
+  [hidden] { display: none !important; }
+
+  @media (max-width: 600px) {
+    .panel { padding: 20px 16px; }
+    main { padding-top: 20px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>YouTube → Markdown</h1>
+  <p class="sub">Вставьте ссылку на видео, и получите текст субтитров в читаемом Markdown.</p>
+
+  <form id="form">
+    <input id="url" type="url" placeholder="https://www.youtube.com/watch?v=..." required>
+    <button class="primary" id="submit" type="submit">Получить текст</button>
+  </form>
+
+  <div id="status" role="status"></div>
+
+  <section id="result">
+    <div class="toolbar">
+      <button class="tab" data-tab="rendered" aria-selected="true">Просмотр</button>
+      <button class="tab" data-tab="raw" aria-selected="false">Markdown</button>
+      <span class="spacer"></span>
+      <button id="copy">Копировать</button>
+      <button id="download">Скачать .md</button>
+    </div>
+
+    <div id="view-rendered" class="panel rendered"></div>
+    <textarea id="raw" hidden spellcheck="false"></textarea>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<script>
+  const form = document.getElementById("form");
+  const urlInput = document.getElementById("url");
+  const submitBtn = document.getElementById("submit");
+  const statusEl = document.getElementById("status");
+  const resultEl = document.getElementById("result");
+  const viewRendered = document.getElementById("view-rendered");
+  const raw = document.getElementById("raw");
+  const copyBtn = document.getElementById("copy");
+  const downloadBtn = document.getElementById("download");
+  const tabs = document.querySelectorAll(".tab");
+
+  let currentTitle = "transcript";
+
+  // Внешние ссылки открываем в новой вкладке
+  DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+    if (node.tagName === "A" && node.getAttribute("href")) {
+      node.setAttribute("target", "_blank");
+      node.setAttribute("rel", "noopener noreferrer");
+    }
+  });
+
+  function render(markdown) {
+    const html = marked.parse(markdown, { breaks: true, gfm: true });
+    viewRendered.innerHTML = DOMPurify.sanitize(html);
+  }
+
+  function setStatus(text, isError = false) {
+    statusEl.textContent = text;
+    statusEl.classList.toggle("error", isError);
+  }
+
+  function showTab(name) {
+    tabs.forEach((t) => t.setAttribute("aria-selected", String(t.dataset.tab === name)));
+    viewRendered.hidden = name !== "rendered";
+    raw.hidden = name !== "raw";
+  }
+
+  tabs.forEach((t) => t.addEventListener("click", () => showTab(t.dataset.tab)));
+
+  // Правки в Markdown сразу отражаются в просмотре
+  raw.addEventListener("input", () => render(raw.value));
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const url = urlInput.value.trim();
+    if (!url) return;
+
+    submitBtn.disabled = true;
+    resultEl.style.display = "none";
+    setStatus("Получаем субтитры… это может занять несколько секунд.");
+
+    try {
+      const resp = await fetch("/api/transcript", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        setStatus(data.error || "Что-то пошло не так.", true);
+        return;
+      }
+
+      raw.value = data.markdown;
+      render(data.markdown);
+      currentTitle = (data.title || "transcript").replace(/[\\/:*?"<>|]+/g, "").slice(0, 80) || "transcript";
+      resultEl.style.display = "block";
+      showTab("rendered");
+      setStatus("Готово.");
+    } catch (err) {
+      setStatus("Не удалось связаться с сервером. Проверьте, что он запущен.", true);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  copyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(raw.value);
+      setStatus("Markdown скопирован в буфер обмена.");
+    } catch {
+      setStatus("Не удалось скопировать. Выделите текст во вкладке Markdown вручную.", true);
+    }
+  });
+
+  downloadBtn.addEventListener("click", () => {
+    const blob = new Blob([raw.value], { type: "text/markdown;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${currentTitle}.md`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+</script>
+</body>
+</html>
